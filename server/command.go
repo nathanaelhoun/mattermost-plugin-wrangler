@@ -174,14 +174,14 @@ func getAutocompleteData() *model.AutocompleteData {
 	move := model.NewAutocompleteData("move", "[subcommand]", "Move messages")
 	moveThread := model.NewAutocompleteData("thread", "[MESSAGE_ID] [CHANNEL_ID]", "Move a message and the thread it belongs to")
 	moveThread.AddTextArgument("The ID of the message to be moved", "[MESSAGE_ID]", "")
-	moveThread.AddTextArgument("The ID of the channel where the message will be moved to", "[CHANNEL_ID]", "")
+	moveThread.AddDynamicListArgument("The ID of the channel where the message will be copied to", "dynamic_channels", true)
 	move.AddCommand(moveThread)
 	wrangler.AddCommand(move)
 
 	copy := model.NewAutocompleteData("copy", "[subcommand]", "Copy messages")
 	copyThread := model.NewAutocompleteData("thread", "[MESSAGE_ID] [CHANNEL_ID]", "Copy a message and the thread it belongs to")
 	copyThread.AddTextArgument("The ID of the message to be copied", "[MESSAGE_ID]", "")
-	copyThread.AddTextArgument("The ID of the channel where the message will be copied to", "[CHANNEL_ID]", "")
+	copyThread.AddDynamicListArgument("The ID of the channel where the message will be copied to", "dynamic_channels", true)
 	copy.AddCommand(copyThread)
 	wrangler.AddCommand(copy)
 

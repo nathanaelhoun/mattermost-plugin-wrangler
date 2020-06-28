@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/mattermost/mattermost-server/v5/model"
 	"github.com/mattermost/mattermost-server/v5/plugin"
 )
 
@@ -41,6 +43,8 @@ func (p *Plugin) serveHTTP(c *plugin.Context, w http.ResponseWriter, r *http.Req
 		return p.handleRouteAPISettings(w, r)
 	case routeProfileImage:
 		return p.handleProfileImage(w, r)
+	case "/dynamic_channels":
+		return p.handleDynamicChannels(w, r)
 	}
 
 	return respondErr(w, http.StatusNotFound, errors.New("not found"))
@@ -87,6 +91,46 @@ func (p *Plugin) handleProfileImage(w http.ResponseWriter, r *http.Request) (int
 
 	w.Header().Set("Content-Type", "image/png")
 	io.Copy(w, img)
+
+	return http.StatusOK, nil
+}
+
+func (p *Plugin) handleDynamicChannels(w http.ResponseWriter, r *http.Request) (int, error) {
+	userId := r.Header.Get("Mattermost-User-Id")
+	response := make([]model.AutocompleteListItem, 0)
+
+	teams, appErr := p.API.GetTeamsForUser(userId)
+	if appErr != nil {
+		p.API.LogError("failed to get teams for user", "err", appErr.Error())
+		return respondErr(w, http.StatusInternalServerError, errors.New("internal error"))
+	}
+
+	for _, team := range teams {
+		channels, appErr := p.API.GetChannelsForTeamForUser(team.Id, userId, false)
+		if appErr != nil {
+			p.API.LogError("failed to get channels for team for user", "err", appErr.Error())
+			return respondErr(w, http.StatusInternalServerError, errors.New("internal error"))
+		}
+
+		for _, channel := range channels {
+			if channel.IsGroupOrDirect() {
+				continue
+			}
+
+			response = append(response, model.AutocompleteListItem{
+				Hint:     fmt.Sprintf("— %s", channel.DisplayName),
+				HelpText: fmt.Sprintf("Team: %s", team.DisplayName),
+				Item:     channel.Id,
+			})
+		}
+	}
+
+	b, _ := json.Marshal(response)
+	w.Header().Set("Content-Type", "application/json")
+	if _, err := w.Write(b); err != nil {
+		p.API.LogError("failed to write status", "err", err.Error())
+		return respondErr(w, http.StatusInternalServerError, errors.New("internal error"))
+	}
 
 	return http.StatusOK, nil
 }
